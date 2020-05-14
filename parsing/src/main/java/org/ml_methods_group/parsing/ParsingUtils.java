@@ -4,24 +4,35 @@ import org.ml_methods_group.common.Dataset;
 import org.ml_methods_group.common.Solution;
 import org.ml_methods_group.common.Solution.Verdict;
 
+import javax.xml.crypto.Data;
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.function.IntPredicate;
 
 import static org.ml_methods_group.common.Solution.Verdict.FAIL;
 import static org.ml_methods_group.common.Solution.Verdict.OK;
 
 public class ParsingUtils {
-    public static Dataset parse(InputStream stream, CodeValidator validator,
-                                IntPredicate problemFilter) throws IOException {
+
+    public static Dataset parseAllSolutions(InputStream stream, CodeValidator validator,
+                                            IntPredicate problemFilter) throws IOException {
+        return parseSolutions(stream, new JavaCodeValidator(), problemFilter, false);
+    }
+
+    public static Dataset parseOnlyLastSolutions(InputStream stream, CodeValidator validator,
+                                                 IntPredicate problemFilter) throws IOException {
+        return parseSolutions(stream, new JavaCodeValidator(), problemFilter, true);
+    }
+
+    private static Dataset parseSolutions(InputStream stream, CodeValidator validator,
+                                          IntPredicate problemFilter, boolean onlyLast) throws IOException {
         CSVParser<Column> parser = new CSVParser<>(stream, Column::byName, Column.class);
         final HashMap<Long, Integer> sessionIds = new HashMap<>();
         final Map<Long, Solution> lastSolution = new HashMap<>();
         final Map<Long, Long> lastTime = new HashMap<>();
+        final Map<Long, Long> firstTime = new HashMap<>();
+        final ArrayList<Solution> allSolutions = new ArrayList<>();
 
         while (parser.hasNextLine()) {
             parser.nextLine();
@@ -38,8 +49,11 @@ public class ParsingUtils {
             final long id = (((long) userId) << 32) | (problemId << 1) | verdict.ordinal();
             sessionIds.putIfAbsent(id >> 1, sessionIds.size());
             final long time = parser.getLongOrDefault(Column.TIME, Long.MAX_VALUE);
-            if (time >= lastTime.getOrDefault(id, Long.MIN_VALUE)) {
-                final int sessionId = sessionIds.get(id >> 1);
+
+            if (onlyLast &&
+                    (time >= lastTime.getOrDefault(id, Long.MIN_VALUE) && verdict == FAIL
+                            || time <= firstTime.getOrDefault(id, Long.MAX_VALUE) && verdict == OK)) {
+                final var sessionId = sessionIds.get(id >> 1);
                 final Solution solution = new Solution(
                         code.get(),
                         problemId,
@@ -47,14 +61,26 @@ public class ParsingUtils {
                         sessionId * 10 + verdict.ordinal(),
                         verdict);
                 lastSolution.put(id, solution);
-                lastTime.put(id, time);
+                if (verdict == FAIL) {
+                    lastTime.put(id, time);
+                } else {
+                    firstTime.put(id, time);
+                }
+            } else if (!onlyLast) {
+                final var sessionId = sessionIds.get(id >> 1);
+                final Solution solution = new Solution(
+                        code.get(),
+                        problemId,
+                        sessionId,
+                        sessionId * 100 + verdict.ordinal(),
+                        verdict);
+                allSolutions.add(solution);
             }
         }
-        return new Dataset(lastSolution.values());
-    }
-
-    public static Dataset parseJavaSolutions(InputStream stream, int problemId) throws IOException {
-        return parse(stream, new JavaCodeValidator(), x -> x == problemId);
+        if (onlyLast)
+            return new Dataset(lastSolution.values());
+        else
+            return new Dataset(allSolutions);
     }
 
     private enum Column {
