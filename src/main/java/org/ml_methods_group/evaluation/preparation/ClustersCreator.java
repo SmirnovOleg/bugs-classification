@@ -42,36 +42,6 @@ public class ClustersCreator {
             new ClusteringApproachTemplate(((dataset, generator) ->
                     BOWApproach.getDefaultApproach(20000, dataset, generator)));
 
-    public static String[] problems = {
-            "loggers",
-            "deserialization",
-            "reflection",
-            "factorial",
-    };
-
-    public static void main(String[] argv) throws Exception {
-//        final List<Cluster<Solution>> clusters =
-//                loadSolutionClusters(EvaluationInfo.PATH_TO_CLUSTERS.resolve("global_clusters.tmp"))
-//                        .getClusters().stream()
-//                        .sorted(Comparator.<Cluster<Solution>>comparingInt(Cluster::size).reversed())
-//                        .limit(50)
-//                        .collect(Collectors.toList());
-//        SolutionMarksHolder localMarksHolder = new SolutionMarksHolder();
-//        for (String problem : problems) {
-//            final SolutionMarksHolder trainHolder =
-//                    loadSolutionMarksHolder(EvaluationInfo.PATH_TO_DATASET.resolve(problem).resolve("extended.tmp"));
-//            trainHolder.forEach(e -> {
-//                Solution solution = e.getKey();
-//                e.getValue().forEach(mark -> localMarksHolder.addMark(solution, mark));
-//            });
-//
-//        }
-//        storeMarkedClusters(
-//                markClusters(clusters, localMarksHolder),
-//                EvaluationInfo.PATH_TO_CLUSTERS.resolve("marked_global_clusters.tmp")
-//        );
-    }
-
     public ClustersCreator() {
         final ASTGenerator astGenerator = new CachedASTGenerator(new NamesASTNormalizer());
         this.changeGenerator = new BasicChangeGenerator(astGenerator);
@@ -85,7 +55,7 @@ public class ClustersCreator {
 
     public void createClusters(String problem) throws Exception {
         try (final HashDatabase database = new HashDatabase(EvaluationInfo.PATH_TO_CACHE)) {
-            final Dataset train = loadDataset(EvaluationInfo.PATH_TO_DATASET.resolve(problem).resolve("train.tmp"));
+            final Dataset train = loadDataset(EvaluationInfo.PATH_TO_DATASET.resolve(problem).resolve("train_rand.tmp"));
             final List<Solution> correct = train.getValues(x -> x.getVerdict() == OK);
             final List<Solution> incorrect = train.getValues(x -> x.getVerdict() == FAIL);
 
@@ -100,7 +70,7 @@ public class ClustersCreator {
                     .getClusterer(0.3);
             final Clusters<Solution> clusters = clusterer.buildClusters(incorrect);
             storeSolutionClusters(clusters,
-                    EvaluationInfo.PATH_TO_DATASET.resolve(problem).resolve("unmarked_clusters.tmp")
+                    EvaluationInfo.PATH_TO_DATASET.resolve(problem).resolve("unmarked_clusters_rand.tmp")
             );
         }
     }

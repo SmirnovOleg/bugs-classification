@@ -94,7 +94,7 @@ public class Application {
 
     public static void parse(Path data, Path storage, int problemId) throws IOException {
         try (InputStream input = new FileInputStream(data.toFile())) {
-            final Dataset dataset = ParsingUtils.parse(input, new JavaCodeValidator(), x -> x == problemId);
+            final Dataset dataset = ParsingUtils.parseOnlyLastSolutions(input, new JavaCodeValidator(), x -> x == problemId);
             ProtobufSerializationUtils.storeDataset(dataset, storage);
         }
     }
